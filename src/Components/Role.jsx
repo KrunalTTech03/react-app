@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { FaHome, FaSignOutAlt, FaUserPlus, FaUsers } from "react-icons/fa";
-import { FiBell, FiSearch } from "react-icons/fi";
 import { MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import { MdAssignmentInd } from "react-icons/md";
 import axiosInstance from "../../axiosInstance";
@@ -29,8 +27,6 @@ function Role() {
   const [openMenu, setOpenMenu] = useState(null);
   const dropdownRef = useRef(null);
   const [showAssignRoleModal, setShowAssignRoleModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [users, setUsers] = useState([]);
   const [showRemoveRoleModal, setShowRemoveRoleModal] = useState(false);
   const [removeRolePayload, setRemoveRolePayload] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -47,7 +43,8 @@ function Role() {
       const response = await axiosInstance.get("/User/all/");
       toast.success("Users Fetched");
       console.log("Users fetched:", response.data.data);
-      setUsers(response.data.data);
+      // We're not using this state anymore, so let's just log it
+      // setUsers(response.data.data);
     } catch (error) {
       console.error("Error fetching users:", error.message);
       toast.error("Failed to fetch users");
@@ -135,6 +132,7 @@ function Role() {
       [name]: value,
     }));
   };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
 
@@ -231,8 +229,7 @@ function Role() {
     };
   }, []);
 
-  const handleReassignRole = (role) => {
-    setSelectedRole(role);
+  const handleReassignRole = () => {
     setShowAssignRoleModal(true);
   };
 
@@ -580,11 +577,11 @@ function Role() {
                               </div>
                             </div>
 
-                            {showAssignRoleModal && selectedRole && (
+                            {showAssignRoleModal && (
                               <AssignRoleToUserModal
-                                role={selectedRole}
-                                users={users}
                                 onClose={() => setShowAssignRoleModal(false)}
+                                fetchRoles={fetchRoles}
+                                fetchUsers={fetchUsers}
                               />
                             )}
 

@@ -9,7 +9,6 @@ function RemovePermissionfromRole({ isOpen, onClose, roles }) {
   const [permissions, setPermissions] = useState([]);
   const [selectedPermission, setSelectedPermission] = useState(null);
 
-  // Transform roles data for react-select
   const roleOptions = roles.map(role => ({
     value: role.role_Id,
     label: role.role_name
@@ -87,7 +86,6 @@ function RemovePermissionfromRole({ isOpen, onClose, roles }) {
     }
   };
 
-  // Custom styles for react-select
   const selectStyles = {
     control: (base) => ({
       ...base,
