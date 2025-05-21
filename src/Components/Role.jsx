@@ -11,6 +11,8 @@ import AssignPermissionModal from "../Components/AssignPermission";
 import RemovePermissionfromRole from "../Components/RemovePermissionfromRole";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import { usePermissions } from "../Hooks/UsePermission";
+import PERMISSIONS from "../Constants/Permissions";
 
 function Role() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -30,32 +32,21 @@ function Role() {
   const [showRemoveRoleModal, setShowRemoveRoleModal] = useState(false);
   const [removeRolePayload, setRemoveRolePayload] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedRoleIdForPermission, setSelectedRoleIdForPermission] =
     useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showRemovePermissionModal, setShowRemovePermissionModal] =
     useState(false);
   const toggleDropdown = () => setShowDropdown(!showDropdown);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const response = await axiosInstance.get("/User/all/");
-      toast.success("Users Fetched");
-      console.log("Users fetched:", response.data.data);
-      // We're not using this state anymore, so let's just log it
-      // setUsers(response.data.data);
-    } catch (error) {
-      console.error("Error fetching users:", error.message);
-      toast.error("Failed to fetch users");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  const { hasPermission } = usePermissions();
+  const canCreateRole = hasPermission(PERMISSIONS.ADD_ROLE);
+  const canEditRole = hasPermission(PERMISSIONS.UPDATE_ROLE);
+  const canDeleteRole = hasPermission(PERMISSIONS.DELETE_ROLE);
+  const canManagePermissions = hasPermission(
+    PERMISSIONS.MANAGE_ROLE_PERMISSIONS
+  );
 
   const fetchRoles = async () => {
     setLoading(true);
@@ -249,14 +240,56 @@ function Role() {
     setShowDropdown(false);
   };
 
+  useEffect(() => {
+    const storedState = localStorage.getItem("sidebarCollapsed");
+    if (storedState !== null) {
+      setSidebarCollapsed(JSON.parse(storedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleSidebarStateChange = (event) => {
+      setSidebarCollapsed(event.detail.collapsed);
+    };
+
+    window.addEventListener("sidebarStateChanged", handleSidebarStateChange);
+
+    return () => {
+      window.removeEventListener(
+        "sidebarStateChanged",
+        handleSidebarStateChange
+      );
+    };
+  }, []);
+
+  const toggleMobileSidebar = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar
-        showLogoutConfirm={showLogoutConfirm}
-        setShowLogoutConfirm={setShowLogoutConfirm}
-      />
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex-1 flex flex-col ml-72 overflow-auto">
+      <div
+        className={`lg:block ${mobileSidebarOpen ? "block" : "hidden"} z-30`}
+      >
+        <Sidebar
+          showLogoutConfirm={showLogoutConfirm}
+          setShowLogoutConfirm={setShowLogoutConfirm}
+          toggleMobileSidebar={toggleMobileSidebar}
+        />
+      </div>
+
+      <div
+        className={`flex-1 flex flex-col transition-all duration-300 
+        ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"} 
+        md:ml-0 sm:ml-0 overflow-auto`}
+      >
         <Header />
 
         <main className="flex-1 p-10 bg-white mx-8 my-5 rounded-xl shadow-lg border border-gray-100">
@@ -277,57 +310,65 @@ function Role() {
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
                   <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setShowCreateModal(true);
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Create Role
-                    </button>
+                    {canCreateRole && (
+                      <button
+                        onClick={() => {
+                          setShowCreateModal(true);
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Create Role
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => {
-                        if (roles && roles.length > 0) {
-                          handleReassignRole(roles[0]);
-                          setShowDropdown(false);
-                        } else {
-                          toast.error("No roles available to assign");
-                          setShowDropdown(false);
-                        }
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Assign Role
-                    </button>
+                    {canCreateRole && (
+                      <button
+                        onClick={() => {
+                          if (roles && roles.length > 0) {
+                            handleReassignRole(roles[0]);
+                            setShowDropdown(false);
+                          } else {
+                            toast.error("No roles available to assign");
+                            setShowDropdown(false);
+                          }
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Assign Role
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => {
-                        if (roles && roles.length > 0) {
-                          handleOpenAssignModal(roles[0]?.role_Id);
-                          setShowDropdown(false);
-                        } else {
-                          toast.error(
-                            "No roles available to manage permissions"
-                          );
-                          setShowDropdown(false);
-                        }
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Manage Permission
-                    </button>
+                    {canCreateRole && (
+                      <button
+                        onClick={() => {
+                          if (roles && roles.length > 0) {
+                            handleOpenAssignModal(roles[0]?.role_Id);
+                            setShowDropdown(false);
+                          } else {
+                            toast.error(
+                              "No roles available to manage permissions"
+                            );
+                            setShowDropdown(false);
+                          }
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Manage Permission
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => {
-                        handleRemovePermission();
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Remove Permission
-                    </button>
+                    {canCreateRole && (
+                      <button
+                        onClick={() => {
+                          handleRemovePermission();
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Remove Permission
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -540,36 +581,53 @@ function Role() {
                                       animate={{ opacity: 1, scale: 1, y: 0 }}
                                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
                                       transition={{ duration: 0.2 }}
-                                      className="origin-top-right absolute right-0 mt-2 w-48 shadow-lg bg-white ring-1 ring-gray-200 ring-opacity-5 z-20"
+                                      className="origin-top-right absolute right-0 w-56 shadow-lg bg-white ring-1 ring-gray-200 ring-opacity-5 z-20"
                                     >
                                       <div className="py-1">
-                                        <button
-                                          onClick={() => handleEditClick(role)}
-                                          className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100"
-                                        >
-                                          Edit
-                                        </button>
-
-                                        <button
-                                          onClick={() =>
-                                            handleDeleteRole(role.role_Id)
-                                          }
-                                          className="block w-full px-4 py-2 text-left text-red-600 hover:bg-red-50"
-                                        >
-                                          Delete
-                                        </button>
-
-                                        <button
-                                          onClick={() =>
-                                            handleRemoveRoleClick(
-                                              null,
-                                              role.role_Id
-                                            )
-                                          }
-                                          className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100"
-                                        >
-                                          Manage User Roles
-                                        </button>
+                                        {canEditRole ||
+                                        canDeleteRole ||
+                                        canManagePermissions ? (
+                                          <>
+                                            {canEditRole && (
+                                              <button
+                                                onClick={() =>
+                                                  handleEditClick(role)
+                                                }
+                                                className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100"
+                                              >
+                                                Edit
+                                              </button>
+                                            )}
+                                            {canDeleteRole && (
+                                              <button
+                                                onClick={() =>
+                                                  handleDeleteRole(role.role_Id)
+                                                }
+                                                className="block w-full px-4 py-2 text-left text-red-600 hover:bg-red-50"
+                                              >
+                                                Delete
+                                              </button>
+                                            )}
+                                            {canManagePermissions && (
+                                              <button
+                                                onClick={() =>
+                                                  handleRemoveRoleClick(
+                                                    null,
+                                                    role.role_Id
+                                                  )
+                                                }
+                                                className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100"
+                                              >
+                                                Manage User Roles
+                                              </button>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <div className="px-4 py-2 text-center text-sm text-gray-500 italic">
+                                            🚫 You are not authorized. Access
+                                            Denied!
+                                          </div>
+                                        )}
                                       </div>
                                     </motion.div>
                                   )}
@@ -581,7 +639,6 @@ function Role() {
                               <AssignRoleToUserModal
                                 onClose={() => setShowAssignRoleModal(false)}
                                 fetchRoles={fetchRoles}
-                                fetchUsers={fetchUsers}
                               />
                             )}
 
@@ -592,7 +649,6 @@ function Role() {
                                 onClose={() => setShowRemoveRoleModal(false)}
                                 onSuccess={() => {
                                   fetchRoles();
-                                  fetchUsers();
                                   toast.success(
                                     "User roles updated successfully"
                                   );

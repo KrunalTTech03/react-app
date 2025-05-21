@@ -3,7 +3,6 @@ import { FiBell, FiChevronDown, FiList } from "react-icons/fi";
 
 const Header = ({ notifications = [], clearNotifications = () => {} }) => {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [FirstName, setUserName] = useState("");
 
   const dropdownRef = useRef();
@@ -11,16 +10,6 @@ const Header = ({ notifications = [], clearNotifications = () => {} }) => {
   useEffect(() => {
     const name = localStorage.getItem("FirstName");
     if (name) setUserName(name);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowProfileDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -77,8 +66,8 @@ const Header = ({ notifications = [], clearNotifications = () => {} }) => {
         </div>
 
         <div className="relative" ref={dropdownRef}>
-          <div
-            onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+          <a
+            href="/UserProfile"
             className="flex items-center gap-3 cursor-pointer group"
           >
             <img
@@ -89,7 +78,7 @@ const Header = ({ notifications = [], clearNotifications = () => {} }) => {
             <span className="text-gray-800 font-medium text-lg group-hover:text-blue-600 transition">
               {FirstName || "User"}
             </span>
-          </div>
+          </a>
         </div>
       </div>
     </header>

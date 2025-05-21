@@ -45,6 +45,8 @@ function Menu() {
   const [menuOptions, setMenuOptions] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [menuToDelete, setMenuToDelete] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const {
     register,
@@ -203,6 +205,29 @@ function Menu() {
         return menu;
       });
     });
+  };
+
+  useEffect(() => {
+    const storedState = localStorage.getItem('sidebarCollapsed');
+    if (storedState !== null) {
+      setSidebarCollapsed(JSON.parse(storedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleSidebarStateChange = (event) => {
+      setSidebarCollapsed(event.detail.collapsed);
+    };
+
+    window.addEventListener('sidebarStateChanged', handleSidebarStateChange);
+
+    return () => {
+      window.removeEventListener('sidebarStateChanged', handleSidebarStateChange);
+    };
+  }, []);
+
+  const toggleMobileSidebar = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
   };
 
   const renderMenuItems = (menuItems, depth = 0) => {
@@ -374,13 +399,25 @@ function Menu() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <Toaster position="top-right" />
-      <Sidebar
-        showLogoutConfirm={showLogoutConfirm}
-        setShowLogoutConfirm={setShowLogoutConfirm}
-      />
+      {mobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex-1 flex flex-col md:ml-72 overflow-auto">
+      <div className={`lg:block ${mobileSidebarOpen ? 'block' : 'hidden'} z-30`}>
+      <Toaster position="top-right" />
+        <Sidebar
+          showLogoutConfirm={showLogoutConfirm}
+          setShowLogoutConfirm={setShowLogoutConfirm}
+          toggleMobileSidebar={toggleMobileSidebar}
+        />
+      </div>
+
+      <div className={`flex-1 flex flex-col transition-all duration-300 
+        ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'} 
+        md:ml-0 sm:ml-0 overflow-auto`}>
         <Header />
 
         <main className="flex-1 p-4 sm:p-6 md:p-10 bg-white mx-2 sm:mx-4 md:mx-8 my-2 sm:my-3 md:my-5 rounded-xl shadow-lg border border-gray-100">

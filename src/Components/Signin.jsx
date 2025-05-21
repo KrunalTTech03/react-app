@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast'; 
 import axiosInstance from '../../axiosInstance';
 import { Loader } from '../components/Loader';
+import { useAuth } from '../Auth/AuthContext'; // Import AuthContext
 
 export const Signin = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +12,7 @@ export const Signin = () => {
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { setUser } = useAuth(); // Access setUser from context
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -51,35 +53,30 @@ export const Signin = () => {
       const response = await axiosInstance.post('/auth/login', { email, password });
 
       if (response.data && response.data.success) {
-        // Store token
-        localStorage.setItem('authToken', response.data.data.token);
-        console.log('Token saved:', response.data.data.token);
-        
-        // Store role
-        localStorage.setItem('Role_Name', response.data.data.role_Name);
-        console.log('Role saved:', response.data.data.role_Name);
-        
-        // Store user ID
-        localStorage.setItem('userId', response.data.data.id);
-        console.log('Id saved:', response.data.data.id);
-        
-        // Store permissions
-        if (response.data.data.permissions && Array.isArray(response.data.data.permissions)) {
-          // Store all permissions as a JSON string
-          localStorage.setItem('userPermissions', JSON.stringify(response.data.data.permissions));
-          console.log('Permissions saved:', response.data.data.permissions);
-        }
-        
+        const { token, role_Name, permissions, id } = response.data.data;
+
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('Role_Name', role_Name);
+        localStorage.setItem('userId', id);
+        localStorage.setItem('userPermissions', JSON.stringify(permissions || []));
+
+        setUser({
+          id,
+          roles: [role_Name],
+          permissions: permissions || [],
+        });
+
         return { success: true };
       } else {
-        console.error('Login failed:', response.data.message || 'Invalid credentials');
         return { success: false, message: response.data.message || 'Invalid credentials' };
       }
     } catch (error) {
-      console.error('Error during login:', error);
-      return { success: false, message: error.response?.data?.message || 'Network error. Please try again later.' };
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Network error. Please try again later.',
+      };
     }
-  };  
+  };
 
   return (
     <>
@@ -97,7 +94,9 @@ export const Signin = () => {
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={`w-full mt-1 p-3 border ${emailError ? 'border-red-600' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all`}
+                  className={`w-full mt-1 p-3 border ${
+                    emailError ? 'border-red-600' : 'border-gray-300'
+                  } rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all`}
                 />
                 {emailError && <p className="text-sm text-red-600 mt-1">{emailError}</p>}
               </div>
@@ -109,7 +108,9 @@ export const Signin = () => {
                   name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full mt-1 p-3 border ${passwordError ? 'border-red-600' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all`}
+                  className={`w-full mt-1 p-3 border ${
+                    passwordError ? 'border-red-600' : 'border-gray-300'
+                  } rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all`}
                 />
                 {passwordError && <p className="text-sm text-red-600 mt-1">{passwordError}</p>}
               </div>
@@ -117,7 +118,9 @@ export const Signin = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full mt-6 p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 transition-all ${loading ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+              className={`w-full mt-6 p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 transition-all ${
+                loading ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+              }`}
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>

@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { FaHome, FaUserPlus, FaSignOutAlt, FaUsers } from "react-icons/fa";
+import {
+  FaHome,
+  FaUserPlus,
+  FaSignOutAlt,
+  FaUsers,
+  FaEye,
+  FaFilter,
+} from "react-icons/fa";
 import { FiSearch, FiBell } from "react-icons/fi";
 import axiosInstance from "../../axiosInstance";
 import Select from "react-select";
@@ -10,6 +17,10 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { usePermissions } from "../Hooks/UsePermission";
 import PERMISSIONS from "../Constants/Permissions";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSignInAlt } from "@fortawesome/free-solid-svg-icons";
+import MimicLogin from "./MimicLogin";
+import UserRoles from "../Constants/UserRoles";
 
 export const Listing = () => {
   const [users, setUsers] = useState([]);
@@ -23,6 +34,9 @@ export const Listing = () => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [firstName, setUserName] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showMimicModal, setShowMimicModal] = useState(false);
   const { hasPermission } = usePermissions();
   const canShowActions =
     hasPermission(PERMISSIONS.UPDATE_USER) ||
@@ -35,6 +49,16 @@ export const Listing = () => {
     password: "",
     roles: [],
   });
+  const [userRoleId, setUserRoleId] = useState("");
+
+  useEffect(() => {
+    const roleName = localStorage.getItem("Role_Name");
+    if (roleName) {
+      setUserRoleId(roleName);
+    }
+  }, []);
+
+  const isAdmin = userRoleId === UserRoles.Admin;
 
   const [pagination, setPagination] = useState({
     pageNumber: 1,
@@ -371,14 +395,86 @@ export const Listing = () => {
     setShowNotifications(false);
   };
 
+  useEffect(() => {
+    const storedState = localStorage.getItem("sidebarCollapsed");
+    if (storedState !== null) {
+      setSidebarCollapsed(JSON.parse(storedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleSidebarStateChange = (event) => {
+      setSidebarCollapsed(event.detail.collapsed);
+    };
+
+    window.addEventListener("sidebarStateChanged", handleSidebarStateChange);
+
+    return () => {
+      window.removeEventListener(
+        "sidebarStateChanged",
+        handleSidebarStateChange
+      );
+    };
+  }, []);
+
+  const toggleMobileSidebar = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
+  const handleMimicLogin = async (email) => {
+    try {
+      const response = await axiosInstance.post("/auth/mimic-login", { email });
+
+      if (response.data && response.data.success) {
+        const { token, role_Name, id, permissions } = response.data.data;
+
+        localStorage.setItem("authToken", token);
+        localStorage.setItem("Role_Name", role_Name);
+        localStorage.setItem("userId", id);
+        localStorage.setItem("userPermissions", JSON.stringify(permissions));
+
+        toast.success("Mimic login successful! Redirecting...");
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1000);
+      } else {
+        toast.error(response.data.message || "Mimic login failed.");
+      }
+    } catch (error) {
+      const msg =
+        error.response?.data?.message ||
+        error.message ||
+        "Something went wrong";
+      toast.error(msg);
+    } finally {
+      setShowMimicModal(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar
-        showLogoutConfirm={showLogoutConfirm}
-        setShowLogoutConfirm={setShowLogoutConfirm}
-      />
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex-1 flex flex-col ml-72 overflow-auto">
+      <div
+        className={`lg:block ${mobileSidebarOpen ? "block" : "hidden"} z-30`}
+      >
+        <Sidebar
+          showLogoutConfirm={showLogoutConfirm}
+          setShowLogoutConfirm={setShowLogoutConfirm}
+          toggleMobileSidebar={toggleMobileSidebar}
+        />
+      </div>
+
+      <div
+        className={`flex-1 flex flex-col transition-all duration-300 
+        ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"} 
+        md:ml-0 sm:ml-0 overflow-auto`}
+      >
         <Header
           notifications={notifications}
           clearNotifications={clearNotifications}
@@ -502,7 +598,7 @@ export const Listing = () => {
                       {[
                         { key: "firstName", label: "First Name" },
                         { key: "lastName", label: "Last Name" },
-                        { key: "email", label: "Email" },
+                        { key: "email", label: "E-mail" },
                         { key: "phone", label: "Mobile" },
                         { key: "roles", label: "Role" },
                       ].map(({ key, label }) => (
@@ -511,12 +607,15 @@ export const Listing = () => {
                           className="px-6 py-3 text-left text-sm font-semibold text-gray-600 cursor-pointer"
                           onClick={() => handleSort(key)}
                         >
-                          {label}
-                          {pagination.sortBy === key
-                            ? pagination.sortOrder === "asc"
-                              ? " ↑"
-                              : " ↓"
-                            : ""}
+                          <div className="flex items-center gap-1">
+                            {label}
+                            <FaFilter className="text-gray-500 hover:text-black" />
+                            {pagination.sortBy === key && (
+                              <span>
+                                {pagination.sortOrder === "asc" ? "↑" : "↓"}
+                              </span>
+                            )}
+                          </div>
                         </th>
                       ))}
                       {canShowActions && (
@@ -582,6 +681,17 @@ export const Listing = () => {
                                   className="text-red-600 cursor-pointer hover:underline"
                                 >
                                   Delete
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  className="text-purple-600 cursor-pointer hover:underline"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowMimicModal(true);
+                                  }}
+                                >
+                                  <FontAwesomeIcon icon={faSignInAlt} />
                                 </button>
                               )}
                             </td>
@@ -752,6 +862,13 @@ export const Listing = () => {
               </div>
             </div>
           </div>
+
+          {showMimicModal && (
+            <MimicLogin
+              onClose={() => setShowMimicModal(false)}
+              onConfirm={() => handleMimicLogin(selectedUser?.email)}
+            />
+          )}
 
           {isModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">

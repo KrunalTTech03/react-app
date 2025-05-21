@@ -5,6 +5,8 @@ import Swal from "sweetalert2";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import { usePermissions } from "../Hooks/UsePermission";
+import PERMISSIONS from "../Constants/Permissions";
 
 function Permission() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -18,6 +20,11 @@ function Permission() {
   const [permissionRoles, setPermissionRoles] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [selectedPermissionName, setSelectedPermissionName] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+    const canCreatePermission = hasPermission(PERMISSIONS.ADD_PERMISSION);
+    const canDeletePermission = hasPermission(PERMISSIONS.DELETE_PERMISSION);
 
   const fetchPermissions = async () => {
     setLoading(true);
@@ -135,14 +142,53 @@ function Permission() {
     };
   }, []);
 
+  useEffect(() => {
+    const storedState = localStorage.getItem('sidebarCollapsed');
+    if (storedState !== null) {
+      setSidebarCollapsed(JSON.parse(storedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleSidebarStateChange = (event) => {
+      setSidebarCollapsed(event.detail.collapsed);
+    };
+
+    window.addEventListener('sidebarStateChanged', handleSidebarStateChange);
+
+    return () => {
+      window.removeEventListener('sidebarStateChanged', handleSidebarStateChange);
+    };
+  }, []);
+
+  const toggleMobileSidebar = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar
-        showLogoutConfirm={showLogoutConfirm}
-        setShowLogoutConfirm={setShowLogoutConfirm}
-      />
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex-1 flex flex-col md:ml-72 overflow-auto">
+      <div
+        className={`lg:block ${mobileSidebarOpen ? "block" : "hidden"} z-30`}
+      >
+        <Sidebar
+          showLogoutConfirm={showLogoutConfirm}
+          setShowLogoutConfirm={setShowLogoutConfirm}
+          toggleMobileSidebar={toggleMobileSidebar}
+        />
+      </div>
+
+      <div
+        className={`flex-1 flex flex-col transition-all duration-300 
+        ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"} 
+        md:ml-0 sm:ml-0 overflow-auto`}
+      >
         <Header />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-10 bg-white mx-2 sm:mx-4 lg:mx-8 my-3 sm:my-5 rounded-xl shadow-lg border border-gray-100">
@@ -150,12 +196,14 @@ function Permission() {
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">
               Manage Permissions
             </h2>
+            {canCreatePermission && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-5 py-2 rounded-md cursor-pointer font-medium shadow"
             >
               Create Permission
             </button>
+            )}
           </div>
 
           {showCreateModal && (
@@ -294,6 +342,7 @@ function Permission() {
                                         className="origin-top-right absolute right-0 mt-2 w-40 sm:w-48 shadow-lg bg-white ring-1 ring-gray-200 ring-opacity-5 z-20"
                                       >
                                         <div className="py-1">
+                                        {canDeletePermission && (
                                           <button
                                             onClick={() =>
                                               handleDeletePermission(
@@ -304,6 +353,7 @@ function Permission() {
                                           >
                                             Delete Permission
                                           </button>
+                                        )}
                                         </div>
                                       </motion.div>
                                     )}

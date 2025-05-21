@@ -5,15 +5,19 @@ import toast from "react-hot-toast";
 
 function AssignPermission({ onClose }) {
   const [roles, setRoles] = useState([]);
+  const [menus, setMenus] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedMenu, setSelectedMenu] = useState(null);
   const [permissions, setPermissions] = useState([]);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+
   useEffect(() => {
     fetchRoles();
+    fetchMenus();
     fetchPermissions();
   }, []);
 
@@ -34,6 +38,65 @@ function AssignPermission({ onClose }) {
     }
   };
 
+  const formatMenusForSelect = (menus, level = 0) => {
+  const indent = "  ".repeat(level); 
+  return menus.flatMap(menu => {
+    const formattedMenu = {
+      value: menu.id,
+      label: `${indent}${level > 0 ? "└─ " : ""}${menu.title}`,
+    };
+
+    const subMenus = menu.subMenus?.length
+      ? formatMenusForSelect(menu.subMenus, level + 1)
+      : [];
+
+    return [formattedMenu, ...subMenus];
+  });
+};
+
+
+const fetchMenus = async () => {
+  setLoading(true);
+  try {
+    const response = await axiosInstance.get("/Menu/all");
+    const menuData = response.data.data || [];
+
+    const menuOptions = formatMenusForSelect(menuData);
+    setMenus(menuOptions);
+  } catch (error) {
+    console.error("Error fetching menus:", error);
+    toast.error("Failed to load menus");
+  } finally {
+    setLoading(false);
+  }
+};
+
+// const fetchMenus = async () => {
+//     setLoading(true);
+//     try {
+//       const response = await axiosInstance.get("/Menu/all");
+//       const menuData = response.data.data || [];
+
+//       const groupedMenuOptions = menuData.map((menu) => ({
+//         label: menu.title,
+//         options: [
+//           { value: menu.id, label: menu.title },
+//           ...(menu.subMenus || []).map((sub) => ({
+//             value: sub.id,
+//             label: sub.title,
+//           })),
+//         ],
+//       }));
+
+//       setMenus(groupedMenuOptions);
+//     } catch (error) {
+//       console.error("Error fetching menus:", error);
+//       toast.error("Failed to load menus");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
   const fetchPermissions = async () => {
     setLoading(true);
     try {
@@ -52,22 +115,36 @@ function AssignPermission({ onClose }) {
     }
   };
 
-  const handleRoleChange = async (selectedOption) => {
+  const handleRoleChange = (selectedOption) => {
     setSelectedRole(selectedOption);
-    if (selectedOption) {
-      fetchRolePermissions(selectedOption.value);
-    } else {
-      setSelectedPermissions([]);
+    setSelectedPermissions([]);
+    if (selectedOption && selectedMenu) {
+      fetchRolePermissions(selectedOption.value, selectedMenu.value);
     }
   };
 
-  const fetchRolePermissions = async (roleId) => {
+  const handleMenuChange = (selectedOption) => {
+    setSelectedMenu(selectedOption);
+    setSelectedPermissions([]);
+    if (selectedOption && selectedRole) {
+      fetchRolePermissions(selectedRole.value, selectedOption.value);
+    }
+  };
+
+  const fetchRolePermissions = async (roleId, menuId) => {
+    if (!roleId || !menuId) return;
+
     setLoading(true);
     try {
-      const response = await axiosInstance.get(`/Permission/role/${roleId}`);
+      const response = await axiosInstance.get(
+        `/Permission/role/${roleId}/menu/${menuId}/permissions`
+      );
       const rolePermissions = response.data.data || [];
 
-      const permissionIds = rolePermissions.map((perm) => perm.permissionIds);
+      const permissionIds = permissions
+        .filter((permission) => rolePermissions.includes(permission.name))
+        .map((permission) => permission.id);
+
       setSelectedPermissions(permissionIds);
     } catch (error) {
       console.error("Error fetching role permissions:", error);
@@ -121,10 +198,16 @@ function AssignPermission({ onClose }) {
       return;
     }
 
+    if (!selectedMenu) {
+      toast.error("Please select a menu");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         roleId: selectedRole.value,
+        menuId: selectedMenu.value,
         permissionIds: selectedPermissions,
       };
 
@@ -200,7 +283,7 @@ function AssignPermission({ onClose }) {
             Role Permission Management
           </h2>
 
-          <div className="mb-5">
+          <div className="mb-4">
             <label className="block text-sm text-left font-medium text-gray-700 mb-1">
               Select Role <span className="text-red-500">*</span>
             </label>
@@ -210,6 +293,22 @@ function AssignPermission({ onClose }) {
               options={roles}
               styles={customSelectStyles}
               placeholder="Select a role"
+              isDisabled={loading || saving}
+              isClearable
+              className="text-left"
+            />
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-sm text-left font-medium text-gray-700 mb-1">
+              Select Menu <span className="text-red-500">*</span>
+            </label>
+            <Select
+              value={selectedMenu}
+              onChange={handleMenuChange}
+              options={menus}
+              styles={customSelectStyles}
+              placeholder="Select a menu"
               isDisabled={loading || saving}
               isClearable
               className="text-left"
@@ -273,7 +372,7 @@ function AssignPermission({ onClose }) {
             <button
               onClick={handleSubmit}
               className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-gray-500 to-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              disabled={!selectedRole || saving}
+              disabled={!selectedRole || !selectedMenu || saving}
             >
               {saving ? (
                 <div className="flex items-center justify-center gap-2">
@@ -348,7 +447,7 @@ function AssignPermission({ onClose }) {
             </button>
           </div>
 
-          {selectedRole && (
+          {selectedRole && selectedMenu ? (
             <>
               <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border border-gray-200 mb-3">
                 <input
@@ -429,11 +528,9 @@ function AssignPermission({ onClose }) {
                 </div>
               )}
             </>
-          )}
-
-          {!selectedRole && (
+          ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500">
-              Please select a role to manage permissions
+              Please select both a role and menu to manage permissions
             </div>
           )}
         </div>
