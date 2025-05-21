@@ -16,5 +16,3 @@ If you are developing a production application, we recommend using TypeScript an
 ![image](https://github.com/user-attachments/assets/47f5c2ea-cdeb-4a18-afc2-5bce1a8eea8a)
 
 ![image](https://github.com/user-attachments/assets/5d4e192b-e690-4e94-8050-76f0c59bc15e)
-
-![image](https://github.com/user-attachments/assets/165541dd-d5a5-4163-894b-0d0e5724ce43)
