@@ -2,11 +2,16 @@ import React, { useState, useEffect } from "react";
 import { PiUsersLight } from "react-icons/pi";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import axiosInstance from "../../axiosInstance";
 
 export const Dashboard = () => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [totalUserCount, setTotalUserCount] = useState(0);
+  const [topUsers, setTopUsers] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [totalRoleCount, setTotalRoleCount] = useState(0);
 
   useEffect(() => {
     const storedState = localStorage.getItem("sidebarCollapsed");
@@ -33,6 +38,73 @@ export const Dashboard = () => {
   const toggleMobileSidebar = () => {
     setMobileSidebarOpen(!mobileSidebarOpen);
   };
+
+  useEffect(() => {
+    const fetchTotalUserCount = async () => {
+      try {
+        const response = await axiosInstance.get("/User/search");
+
+        if (response.data?.data?.totalCount !== undefined) {
+          setTotalUserCount(response.data.data.totalCount);
+        }
+      } catch (error) {
+        console.error("Error fetching total user count:", error);
+      }
+    };
+
+    fetchTotalUserCount();
+  }, []);
+
+  useEffect(() => {
+    const fetchTopUsers = async () => {
+      try {
+        const response = await axiosInstance.get("User/search", {
+          params: {
+            pageNumber: 1,
+            pageSize: 10,
+          },
+        });
+
+        if (response.data?.data?.users) {
+          setTopUsers(response.data.data.users);
+        }
+      } catch (error) {
+        console.error("Error fetching top users:", error);
+      }
+    };
+
+    fetchTopUsers();
+  }, []);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await axiosInstance.get("/auth/profile");
+        if (response.data?.success && response.data?.data) {
+          setProfile(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  useEffect(() => {
+    const fetchTotalRoles = async () => {
+      try {
+        const response = await axiosInstance.get("/Role");
+        if (response.data?.success && response.data?.data) {
+          setTotalRoleCount(response.data.data.totalCount);
+        }
+      } catch (error) {
+        console.error("Error fetching total roles:", error);
+      }
+    };
+
+    fetchTotalRoles();
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -61,9 +133,36 @@ export const Dashboard = () => {
         <Header />
 
         <main className="flex-1 p-4 sm:p-6 md:p-8 lg:p-10 bg-white mx-2 sm:mx-4 md:mx-6 lg:mx-8 my-2 sm:my-3 md:my-4 lg:my-5 rounded-xl shadow-lg border border-gray-200">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">
-            Welcome to Your Dashboard
-          </h2>
+          {!profile ? (
+            <div className="flex items-center space-x-3 animate-pulse text-gray-600 text-lg font-medium">
+              <svg
+                className="animate-spin h-5 w-5 text-indigo-500"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                ></path>
+              </svg>
+              <span>Loading your profile...</span>
+            </div>
+          ) : (
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">
+              Welcome {profile.firstName}
+            </h2>
+          )}
+
           <p className="text-gray-500 mt-2 sm:mt-3 text-base sm:text-lg">
             Manage your projects, teams, and reports efficiently.
           </p>
@@ -78,9 +177,36 @@ export const Dashboard = () => {
                   <h4 className="text-base sm:text-lg font-medium text-gray-800">
                     Total Users
                   </h4>
-                  <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mt-2">
-                    150
-                  </p>
+                  {totalUserCount === 0 ? (
+                    <div className="flex items-center space-x-2 animate-pulse text-purple-600 text-base sm:text-lg">
+                      <svg
+                        className="animate-spin h-5 w-5 text-purple-600"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        ></path>
+                      </svg>
+                      <span>Loading...</span>
+                    </div>
+                  ) : (
+                    <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mt-2">
+                      {totalUserCount}
+                    </p>
+                  )}
+
                   <p className="text-sm mt-1 text-gray-500">Active accounts</p>
                 </div>
 
@@ -326,9 +452,36 @@ export const Dashboard = () => {
                   <h4 className="text-base sm:text-lg font-medium">
                     Total Roles
                   </h4>
-                  <p className="text-3xl sm:text-4xl font-bold text-emerald-600 mt-2">
-                    24
-                  </p>
+                  {totalRoleCount === 0 ? (
+                    <div className="flex items-center space-x-2 animate-pulse text-emerald-500 text-base sm:text-lg">
+                      <svg
+                        className="animate-spin h-5 w-5 text-emerald-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        ></path>
+                      </svg>
+                      <span>Loading...</span>
+                    </div>
+                  ) : (
+                    <p className="text-3xl sm:text-4xl font-bold text-emerald-600 mt-2">
+                      {totalRoleCount}
+                    </p>
+                  )}
+
                   <p className="text-sm mt-1 text-gray-500">User Roles</p>
                 </div>
                 <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center">
@@ -375,47 +528,51 @@ export const Dashboard = () => {
                     <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-600">
                       Role
                     </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-600">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-gray-200">
-                  <tr className="hover:bg-gray-50 transition">
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-800 font-medium text-sm">
-                      firstName
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
-                      lastName
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
-                      email
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
-                      phone
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
-                      <span className="inline-block bg-gray-100 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-gray-700 mr-2"></span>
-                      <span className="text-red-500">No roles</span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 flex space-x-2 sm:space-x-4">
-                      <button className="text-purple-600 cursor-pointer hover:underline text-sm">
-                        Edit
-                      </button>
-                      <button className="text-red-600 cursor-pointer hover:underline text-sm">
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="text-center py-3 sm:py-4 text-gray-500 text-sm"
-                    >
-                      No users found
-                    </td>
-                  </tr>
+                  {topUsers.length > 0 ? (
+                    topUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-gray-50 transition">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-800 font-medium text-sm">
+                          {user.firstName}
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
+                          {user.lastName}
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
+                          {user.email}
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
+                          {user.phone}
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-sm">
+                          {user.roles?.length > 0 ? (
+                            user.roles.map((role, i) => (
+                              <span
+                                key={i}
+                                className="inline-block bg-gray-100 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-gray-700 mr-2"
+                              >
+                                {role}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-red-500">No roles</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="6"
+                        className="text-center py-3 sm:py-4 text-gray-500 text-sm"
+                      >
+                        No users found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

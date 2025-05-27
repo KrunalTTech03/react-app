@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+Sitemap: http://172.16.3.79:5555/sitemap.xml

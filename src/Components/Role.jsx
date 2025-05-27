@@ -13,6 +13,8 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { usePermissions } from "../Hooks/UsePermission";
 import PERMISSIONS from "../Constants/Permissions";
+import { FaFilter } from "react-icons/fa";
+import Filter from "./Filter";
 
 function Role() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -53,7 +55,7 @@ function Role() {
     try {
       const response = await axiosInstance.get("/Role/");
       console.log("Roles fetched:", response.data.data);
-      setRoles(response.data.data);
+      setRoles(response.data.data.roles);
     } catch (error) {
       console.error("Error fetching roles:", error.message);
       toast.error("Failed to fetch roles");
@@ -266,6 +268,97 @@ function Role() {
     setMobileSidebarOpen(!mobileSidebarOpen);
   };
 
+  const [showFilterPopup, setShowFilterPopup] = useState(false);
+  const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
+  const [filterColumn, setFilterColumn] = useState("");
+  const filterRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setShowFilterPopup(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleFilterClick = (event, columnName) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setFilterPosition({
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+    });
+    setFilterColumn(columnName);
+    setShowFilterPopup(true);
+  };
+
+  const [isFilterApplied, setIsFilterApplied] = useState(false);
+
+  const handleFilterApply = async (filteredData) => {
+    if (!filteredData || filteredData.length === 0) {
+      setIsFilterApplied(false);
+      fetchRoles();
+      fetchRolePermissions();
+      return;
+    }
+
+    setIsFilterApplied(true); // ✅ Filter is applied
+
+    const formattedRoles = filteredData.map((item) => ({
+      role_Id: item.id,
+      role_name: item.name,
+    }));
+
+    const formattedPermissions = filteredData.flatMap((item) =>
+      item.permissions.map((perm) => ({
+        roleId: item.id,
+        permissionName: perm,
+      }))
+    );
+
+    setRoles(formattedRoles);
+    setRolePermissions(formattedPermissions);
+  };
+
+  const handleResetFilters = () => {
+    fetchRoles();
+    fetchRolePermissions();
+    setIsFilterApplied(false);
+
+    toast.custom(
+      (t) => (
+        <div
+          className={`${
+            t.visible ? "animate-enter" : "animate-leave"
+          } bg-blue-50 border border-blue-200 rounded-md shadow-sm flex items-start p-3 min-w-80`}
+        >
+          <div className="flex-shrink-0 mr-3">
+            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs font-bold">i</span>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <div className="text-blue-800 font-medium text-sm mb-1">Info</div>
+            <div className="text-blue-700 text-sm">
+              Filter reset successfully
+            </div>
+          </div>
+
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="flex-shrink-0 ml-3 text-blue-600 hover:text-blue-800 text-lg"
+          >
+            ×
+          </button>
+        </div>
+      ),
+      { duration: 3000 }
+    );
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       {mobileSidebarOpen && (
@@ -299,13 +392,61 @@ function Role() {
             </h2>
 
             <div className="relative">
-              <button
-                onClick={toggleDropdown}
-                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-5 py-2 rounded-md cursor-pointer font-medium shadow flex items-center space-x-2"
-              >
-                <span>Actions</span>
-                <MdKeyboardArrowDown size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                {isFilterApplied && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="ml-3 flex items-center bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-5 h-5 mr-2 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 4h18l-7 8v5l-4 2v-7L3 4z"
+                      />
+                      <circle
+                        cx="18"
+                        cy="6"
+                        r="4"
+                        fill="white"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <line
+                        x1="16.5"
+                        y1="4.5"
+                        x2="19.5"
+                        y2="7.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <line
+                        x1="19.5"
+                        y1="4.5"
+                        x2="16.5"
+                        y2="7.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                    Reset Filter
+                  </button>
+                )}
+                <button
+                  onClick={toggleDropdown}
+                  className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-5 py-2 rounded-md cursor-pointer font-medium shadow flex items-center space-x-2"
+                >
+                  <span>Actions</span>
+                  <MdKeyboardArrowDown size={16} />
+                </button>
+              </div>
 
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
@@ -438,15 +579,39 @@ function Role() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ">
                       No.
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ">
-                      Role Name
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">
+                      <div className="flex items-center gap-2">
+                        Role Name
+                        <FaFilter
+                          className="text-gray-500 cursor-pointer hover:text-black"
+                          title="Filter Role Name"
+                          onClick={(e) => handleFilterClick(e, "role_name")}
+                        />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ">
-                      Permissions
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">
+                      <div className="flex items-center gap-2">
+                        Permission
+                        <FaFilter
+                          className="text-gray-500 cursor-pointer hover:text-black"
+                          title="Filter Permission"
+                          onClick={(e) => handleFilterClick(e, "permission")}
+                        />
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ">
                       Action
                     </th>
+                    {showFilterPopup && (
+                      <div ref={filterRef}>
+                        <Filter
+                          column={filterColumn}
+                          position={filterPosition}
+                          onApply={handleFilterApply}
+                          onClose={() => setShowFilterPopup(false)}
+                        />
+                      </div>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">

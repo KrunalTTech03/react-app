@@ -18,6 +18,8 @@ import CreateMenuPermission from "./CreateMenuPermission";
 import ViewMenuPermissions from "./ViewMenuPermissions";
 import DeleteMenuPermissions from "./DeleteMenuPermissions";
 import EditMenu from "./EditMenu";
+import Filter from "./Filter";
+import { FaFilter } from "react-icons/fa";
 
 function Menu() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -185,30 +187,30 @@ function Menu() {
   };
 
   const handleMenuUpdated = (updatedMenu) => {
-    setMenus(prevMenus => {
-      return prevMenus.map(menu => {
+    setMenus((prevMenus) => {
+      return prevMenus.map((menu) => {
         if (menu.id === updatedMenu.id) {
           return { ...menu, ...updatedMenu };
         }
-        
+
         if (menu.subMenus && menu.subMenus.length > 0) {
-          const updatedSubMenus = menu.subMenus.map(subMenu => {
+          const updatedSubMenus = menu.subMenus.map((subMenu) => {
             if (subMenu.id === updatedMenu.id) {
               return { ...subMenu, ...updatedMenu };
             }
             return subMenu;
           });
-          
+
           return { ...menu, subMenus: updatedSubMenus };
         }
-        
+
         return menu;
       });
     });
   };
 
   useEffect(() => {
-    const storedState = localStorage.getItem('sidebarCollapsed');
+    const storedState = localStorage.getItem("sidebarCollapsed");
     if (storedState !== null) {
       setSidebarCollapsed(JSON.parse(storedState));
     }
@@ -219,10 +221,13 @@ function Menu() {
       setSidebarCollapsed(event.detail.collapsed);
     };
 
-    window.addEventListener('sidebarStateChanged', handleSidebarStateChange);
+    window.addEventListener("sidebarStateChanged", handleSidebarStateChange);
 
     return () => {
-      window.removeEventListener('sidebarStateChanged', handleSidebarStateChange);
+      window.removeEventListener(
+        "sidebarStateChanged",
+        handleSidebarStateChange
+      );
     };
   }, []);
 
@@ -397,17 +402,72 @@ function Menu() {
     }),
   };
 
+  const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const [filterPopupPosition, setFilterPopupPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  const handleFilterIconClick = (column, event) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    setFilterPopupPosition({
+      top: rect.bottom + window.scrollY + 4,
+      left: rect.left + window.scrollX,
+    });
+
+    setOpenFilterColumn(openFilterColumn === column ? null : column);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        !e.target.closest(".filter-popup") &&
+        !e.target.closest(".filter-icon")
+      ) {
+        setOpenFilterColumn(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleMenuFilter = async (filters) => {
+    try {
+      const response = await axiosInstance.post("/Menu/filter", filters, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        toast.error(response.data.message || "Filter failed.");
+        return null;
+      }
+    } catch (error) {
+      toast.error("Error applying menu filter.");
+      console.error("Filter error:", error);
+      return null;
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       {mobileSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
-      <div className={`lg:block ${mobileSidebarOpen ? 'block' : 'hidden'} z-30`}>
-      <Toaster position="top-right" />
+      <div
+        className={`lg:block ${mobileSidebarOpen ? "block" : "hidden"} z-30`}
+      >
+        <Toaster position="top-right" />
         <Sidebar
           showLogoutConfirm={showLogoutConfirm}
           setShowLogoutConfirm={setShowLogoutConfirm}
@@ -415,9 +475,11 @@ function Menu() {
         />
       </div>
 
-      <div className={`flex-1 flex flex-col transition-all duration-300 
-        ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'} 
-        md:ml-0 sm:ml-0 overflow-auto`}>
+      <div
+        className={`flex-1 flex flex-col transition-all duration-300 
+        ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"} 
+        md:ml-0 sm:ml-0 overflow-auto`}
+      >
         <Header />
 
         <main className="flex-1 p-4 sm:p-6 md:p-10 bg-white mx-2 sm:mx-4 md:mx-8 my-2 sm:my-3 md:my-5 rounded-xl shadow-lg border border-gray-100">
@@ -426,70 +488,122 @@ function Menu() {
               Menu List
             </h2>
 
-            <div className="relative">
+            {/* Buttons Grouped Side-by-Side */}
+            <div className="flex gap-3">
               <button
-                onClick={toggleDropdown}
-                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 sm:px-5 py-2 rounded-md cursor-pointer font-medium shadow flex items-center space-x-2"
+                onClick={() => {
+                  fetchMenus();
+                  setOpenFilterColumn(null);
+                  toast.success("Filter reset.");
+                }}
+                className="flex items-center bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition"
               >
-                <span>Actions</span>
-                <MdKeyboardArrowDown size={16} />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 mr-2 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M3 4h18l-7 8v5l-4 2v-7L3 4z"
+                  />
+                  <circle
+                    cx="18"
+                    cy="6"
+                    r="4"
+                    fill="white"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1="16.5"
+                    y1="4.5"
+                    x2="19.5"
+                    y2="7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1="19.5"
+                    y1="4.5"
+                    x2="16.5"
+                    y2="7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+                Reset Filter
               </button>
 
-              {showDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setShowCreateModal(true);
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Create Menu
-                    </button>
+              <div className="relative">
+                <button
+                  onClick={toggleDropdown}
+                  className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 sm:px-5 py-2 rounded-md cursor-pointer font-medium shadow flex items-center space-x-2"
+                >
+                  <span>Actions</span>
+                  <MdKeyboardArrowDown size={16} />
+                </button>
 
-                    <button
-                      onClick={() => {
-                        setShowViewMenuPermissionModal(true);
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + View Permission
-                    </button>
+                {showDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setShowCreateModal(true);
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Create Menu
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setShowCreatePermissionModal(true);
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Create Permission
-                    </button>
+                      <button
+                        onClick={() => {
+                          setShowViewMenuPermissionModal(true);
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + View Permission
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setShowAssignPermissionModal(true);
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Assign Menu Permission
-                    </button>
+                      <button
+                        onClick={() => {
+                          setShowCreatePermissionModal(true);
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Create Permission
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setShowDeleteMenuPermissionModal(true);
-                        setShowDropdown(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                    >
-                      + Remove Permission
-                    </button>
+                      <button
+                        onClick={() => {
+                          setShowAssignPermissionModal(true);
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Assign Menu Permission
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowDeleteMenuPermissionModal(true);
+                          setShowDropdown(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                      >
+                        + Remove Permission
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
@@ -513,17 +627,49 @@ function Menu() {
                         <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           No.
                         </th>
-                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Title
+                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                          <div className="flex items-center gap-1">
+                            Title
+                            <span
+                              className="filter-icon"
+                              onClick={(e) => handleFilterIconClick("Title", e)}
+                            >
+                              <FaFilter className="text-gray-500 hover:text-black cursor-pointer" />
+                            </span>
+                          </div>
                         </th>
-                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Icon
+                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                          <div className="flex items-center gap-1">
+                            Icon
+                            <span
+                              className="filter-icon"
+                              onClick={(e) => handleFilterIconClick("Icon", e)}
+                            >
+                              <FaFilter className="text-gray-500 hover:text-black cursor-pointer" />
+                            </span>
+                          </div>
                         </th>
-                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Path
+                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                          <div className="flex items-center gap-1">
+                            Path
+                            <span
+                              className="filter-icon"
+                              onClick={(e) => handleFilterIconClick("Path", e)}
+                            >
+                              <FaFilter className="text-gray-500 hover:text-black cursor-pointer" />
+                            </span>
+                          </div>
                         </th>
-                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Order
+                        <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                          <div className="flex items-center gap-1">
+                            Order
+                            <span
+                              className="filter-icon"
+                              onClick={(e) => handleFilterIconClick("Order", e)}
+                            >
+                              <FaFilter className="text-gray-500 hover:text-black cursor-pointer" />
+                            </span>
+                          </div>
                         </th>
                         <th className="hidden sm:table-cell px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Menu Type
@@ -552,6 +698,19 @@ function Menu() {
                       )}
                     </tbody>
                   </table>
+                  {openFilterColumn && (
+                    <Filter
+                      column={openFilterColumn}
+                      position={filterPopupPosition}
+                      onFilterRequest={handleMenuFilter}
+                      onApply={(filteredData) => {
+                        if (filteredData) setMenus(filteredData);
+                        else fetchMenus();
+                        setOpenFilterColumn(null);
+                      }}
+                      onClose={() => setOpenFilterColumn(null)}
+                    />
+                  )}
                 </div>
               </div>
             </div>

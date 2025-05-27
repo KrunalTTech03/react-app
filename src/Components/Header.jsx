@@ -1,15 +1,24 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { FiBell, FiChevronDown, FiList } from "react-icons/fi";
+import axiosInstance from "../../axiosInstance";
 
 const Header = ({ notifications = [], clearNotifications = () => {} }) => {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [FirstName, setUserName] = useState("");
-
-  const dropdownRef = useRef();
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    const name = localStorage.getItem("FirstName");
-    if (name) setUserName(name);
+    const fetchUserProfile = async () => {
+      try {
+        const response = await axiosInstance.get("/auth/profile");
+        if (response.data?.success && response.data?.data) {
+          setProfile(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    fetchUserProfile();
   }, []);
 
   return (
@@ -65,7 +74,7 @@ const Header = ({ notifications = [], clearNotifications = () => {} }) => {
           )}
         </div>
 
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative">
           <a
             href="/UserProfile"
             className="flex items-center gap-3 cursor-pointer group"
@@ -76,7 +85,7 @@ const Header = ({ notifications = [], clearNotifications = () => {} }) => {
               className="h-11 w-11 rounded-full border-2 border-gray-300 shadow-sm group-hover:scale-105 transition-transform"
             />
             <span className="text-gray-800 font-medium text-lg group-hover:text-blue-600 transition">
-              {FirstName || "User"}
+              {profile ? profile.firstName : "Loading..."}
             </span>
           </a>
         </div>

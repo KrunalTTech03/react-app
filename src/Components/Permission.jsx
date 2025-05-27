@@ -7,6 +7,8 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { usePermissions } from "../Hooks/UsePermission";
 import PERMISSIONS from "../Constants/Permissions";
+import { FaFilter } from "react-icons/fa";
+import Filter from "./Filter";
 
 function Permission() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -23,8 +25,41 @@ function Permission() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { hasPermission } = usePermissions();
-    const canCreatePermission = hasPermission(PERMISSIONS.ADD_PERMISSION);
-    const canDeletePermission = hasPermission(PERMISSIONS.DELETE_PERMISSION);
+  const canCreatePermission = hasPermission(PERMISSIONS.ADD_PERMISSION);
+  const canDeletePermission = hasPermission(PERMISSIONS.DELETE_PERMISSION);
+
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterColumn, setFilterColumn] = useState("");
+  const [filterPopupPosition, setFilterPopupPosition] = useState({
+    top: 180,
+    left: 140,
+  });
+  const filterRef = useRef(null);
+
+  const handleFilterIconClick = (column, e) => {
+    e.stopPropagation();
+    setFilterColumn(column);
+    setFilterPopupPosition({ top: e.clientY, left: e.clientX });
+    setShowFilter(true);
+  };
+
+  const handlePermissionFilter = async (filters) => {
+    try {
+      const response = await axiosInstance.post("/Permission/filter", filters);
+
+      if (response.data.success) {
+        toast.success("Filtered permissions retrieved.");
+        return response.data.data;
+      } else {
+        toast.error(response.data.message || "Filter failed.");
+        return null;
+      }
+    } catch (error) {
+      toast.error("Error applying permission filter.");
+      console.error("Permission filter error:", error);
+      return null;
+    }
+  };
 
   const fetchPermissions = async () => {
     setLoading(true);
@@ -143,7 +178,7 @@ function Permission() {
   }, []);
 
   useEffect(() => {
-    const storedState = localStorage.getItem('sidebarCollapsed');
+    const storedState = localStorage.getItem("sidebarCollapsed");
     if (storedState !== null) {
       setSidebarCollapsed(JSON.parse(storedState));
     }
@@ -154,16 +189,31 @@ function Permission() {
       setSidebarCollapsed(event.detail.collapsed);
     };
 
-    window.addEventListener('sidebarStateChanged', handleSidebarStateChange);
+    window.addEventListener("sidebarStateChanged", handleSidebarStateChange);
 
     return () => {
-      window.removeEventListener('sidebarStateChanged', handleSidebarStateChange);
+      window.removeEventListener(
+        "sidebarStateChanged",
+        handleSidebarStateChange
+      );
     };
   }, []);
 
   const toggleMobileSidebar = () => {
     setMobileSidebarOpen(!mobileSidebarOpen);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setShowFilter(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -196,14 +246,66 @@ function Permission() {
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">
               Manage Permissions
             </h2>
-            {canCreatePermission && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-5 py-2 rounded-md cursor-pointer font-medium shadow"
-            >
-              Create Permission
-            </button>
-            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  fetchPermissions();
+                  setShowFilter(false);
+                  toast.success("Filter reset.");
+                }}
+                className="flex items-center bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 mr-2 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M3 4h18l-7 8v5l-4 2v-7L3 4z"
+                  />
+                  <circle
+                    cx="18"
+                    cy="6"
+                    r="4"
+                    fill="white"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1="16.5"
+                    y1="4.5"
+                    x2="19.5"
+                    y2="7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1="19.5"
+                    y1="4.5"
+                    x2="16.5"
+                    y2="7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+                Reset Filter
+              </button>
+
+              {canCreatePermission && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 rounded-md cursor-pointer font-medium shadow"
+                >
+                  Create Permission
+                </button>
+              )}
+            </div>
           </div>
 
           {showCreateModal && (
@@ -259,16 +361,33 @@ function Permission() {
                         No.
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Permission Name
+                        <div className="flex items-center gap-1">
+                          Permission Name
+                          <FaFilter
+                            className="text-gray-500 cursor-pointer hover:text-black"
+                            title="Filter by Name"
+                            onClick={(e) => handleFilterIconClick("Name", e)}
+                          />
+                        </div>
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Assigned Permissions
+                        <div className="flex items-center gap-1">
+                          Assigned Permissions
+                          <FaFilter
+                            className="text-gray-500 cursor-pointer hover:text-black"
+                            title="Filter by Assigned Roles"
+                            onClick={(e) =>
+                              handleFilterIconClick("assignedroles", e)
+                            }
+                          />
+                        </div>
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-center text-xs font-medium text-gray-500 uppercase">
                         Action
                       </th>
                     </tr>
                   </thead>
+
                   <tbody className="bg-white divide-y divide-gray-200">
                     {permissions && permissions.length > 0 ? (
                       permissions.map((permission, index) => {
@@ -342,18 +461,18 @@ function Permission() {
                                         className="origin-top-right absolute right-0 mt-2 w-40 sm:w-48 shadow-lg bg-white ring-1 ring-gray-200 ring-opacity-5 z-20"
                                       >
                                         <div className="py-1">
-                                        {canDeletePermission && (
-                                          <button
-                                            onClick={() =>
-                                              handleDeletePermission(
-                                                permission.id
-                                              )
-                                            }
-                                            className="block w-full px-4 py-2 text-left text-red-600 hover:bg-red-100 text-sm sm:text-base"
-                                          >
-                                            Delete Permission
-                                          </button>
-                                        )}
+                                          {canDeletePermission && (
+                                            <button
+                                              onClick={() =>
+                                                handleDeletePermission(
+                                                  permission.id
+                                                )
+                                              }
+                                              className="block w-full px-4 py-2 text-left text-red-600 hover:bg-red-100 text-sm sm:text-base"
+                                            >
+                                              Delete Permission
+                                            </button>
+                                          )}
                                         </div>
                                       </motion.div>
                                     )}
@@ -376,6 +495,25 @@ function Permission() {
                     )}
                   </tbody>
                 </table>
+
+                {showFilter && (
+                  <div ref={filterRef}>
+                    <Filter
+                      column={filterColumn}
+                      onFilterRequest={handlePermissionFilter}
+                      onApply={(filteredData) => {
+                        if (filteredData) {
+                          setPermissions(filteredData);
+                        } else {
+                          fetchPermissions();
+                        }
+                        setShowFilter(false);
+                      }}
+                      onClose={() => setShowFilter(false)}
+                      position={filterPopupPosition}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}

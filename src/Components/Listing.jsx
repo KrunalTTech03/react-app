@@ -21,6 +21,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSignInAlt } from "@fortawesome/free-solid-svg-icons";
 import MimicLogin from "./MimicLogin";
 import UserRoles from "../Constants/UserRoles";
+import Filter from "./Filter";
 
 export const Listing = () => {
   const [users, setUsers] = useState([]);
@@ -57,7 +58,7 @@ export const Listing = () => {
       setUserRoleId(roleName);
     }
   }, []);
-
+  const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const isAdmin = userRoleId === UserRoles.Admin;
 
   const [pagination, setPagination] = useState({
@@ -69,16 +70,26 @@ export const Listing = () => {
   });
 
   useEffect(() => {
-    const fetchRoles = async () => {
-      try {
-        const response = await axiosInstance.get("/Role/");
-        setRoles(response.data.data);
-      } catch (error) {
-        console.error("Error fetching roles:", error.message);
+  const fetchRoles = async () => {
+    try {
+      const response = await axiosInstance.get("/Role/");
+      const data = response.data?.data;
+
+      if (data && Array.isArray(data.roles)) {
+        setRoles(data.roles);
+      } else {
+        console.error("Roles API did not return an array:", data);
+        setRoles([]);
       }
-    };
-    fetchRoles();
-  }, []);
+    } catch (error) {
+      console.error("Error fetching roles:", error.message);
+      setRoles([]); 
+    }
+  };
+
+  fetchRoles();
+}, []);
+
 
   const pageSizeOptions = [
     { value: 5, label: "5" },
@@ -145,7 +156,9 @@ export const Listing = () => {
         ...user,
         roles:
           user.roles?.map((roleId) => {
-            const foundRole = roles.find((r) => r.role_Id === roleId);
+            const foundRole = Array.isArray(roles)
+              ? roles.find((r) => r.role_Id === roleId)
+              : null;
             return foundRole ? foundRole.role_name : roleId;
           }) || [],
       }));
@@ -451,6 +464,9 @@ export const Listing = () => {
     }
   };
 
+  const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
+  // const [filtersApplied, setFiltersApplied] = useState(false);
+
   return (
     <div className="flex h-screen bg-gray-100">
       {mobileSidebarOpen && (
@@ -581,14 +597,70 @@ export const Listing = () => {
                     role.
                   </p>
                 </div>
-                {hasPermission(PERMISSIONS.ADD_USER) && (
+
+                <div className="flex space-x-3">
+                  {hasPermission(PERMISSIONS.ADD_USER) && (
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 cursor-pointer rounded-md hover:bg-purple-700 transition"
+                    >
+                      Add User
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 cursor-pointer rounded-md hover:bg-purple-700 transition"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setPagination((prev) => ({
+                        ...prev,
+                        pageNumber: 1,
+                      }));
+                      fetchUsers();
+                      toast.success("Filter reset.");
+                    }}
+                    className="flex items-center bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition"
                   >
-                    Add User
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-5 h-5 mr-2 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 4h18l-7 8v5l-4 2v-7L3 4z"
+                      />
+                      <circle
+                        cx="18"
+                        cy="6"
+                        r="4"
+                        fill="white"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <line
+                        x1="16.5"
+                        y1="4.5"
+                        x2="19.5"
+                        y2="7.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <line
+                        x1="19.5"
+                        y1="4.5"
+                        x2="16.5"
+                        y2="7.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                    Reset Filter
                   </button>
-                )}
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -598,24 +670,65 @@ export const Listing = () => {
                       {[
                         { key: "firstName", label: "First Name" },
                         { key: "lastName", label: "Last Name" },
-                        { key: "email", label: "E-mail" },
+                        { key: "email", label: "Email" },
                         { key: "phone", label: "Mobile" },
                         { key: "roles", label: "Role" },
                       ].map(({ key, label }) => (
                         <th
                           key={key}
-                          className="px-6 py-3 text-left text-sm font-semibold text-gray-600 cursor-pointer"
-                          onClick={() => handleSort(key)}
+                          className="px-6 py-3 text-left text-sm font-semibold text-gray-600 cursor-pointer relative"
+                          onClick={(e) => {
+                            const isFilterClick =
+                              e.target.closest(".filter-icon") ||
+                              e.target.closest(".filter-popup");
+                            if (!isFilterClick) handleSort(key);
+                          }}
                         >
-                          <div className="flex items-center gap-1">
-                            {label}
-                            <FaFilter className="text-gray-500 hover:text-black" />
+                          <div className="flex items-center space-x-1">
+                            <span>{label}</span>
                             {pagination.sortBy === key && (
                               <span>
                                 {pagination.sortOrder === "asc" ? "↑" : "↓"}
                               </span>
                             )}
+                            <span
+                              className="filter-icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const rect =
+                                  e.currentTarget.getBoundingClientRect();
+
+                                setFilterPosition({
+                                  top: rect.bottom + window.scrollY + 4,
+                                  left: rect.left + window.scrollX,
+                                });
+
+                                setOpenFilterColumn(
+                                  openFilterColumn === key ? null : key
+                                );
+                              }}
+                            >
+                              <FaFilter className="text-gray-500 hover:text-black cursor-pointer" />
+                            </span>
                           </div>
+                          {openFilterColumn === key && (
+                            <Filter
+                              column={key}
+                              position={filterPosition}
+                              onApply={(filter) => {
+                                if (Array.isArray(filter)) {
+                                  setUsers(filter);
+                                  setPagination((prev) => ({
+                                    ...prev,
+                                    totalCount: filter.length,
+                                  }));
+                                } else {
+                                  fetchUsers();
+                                }
+                              }}
+                              onClose={() => setOpenFilterColumn(null)}
+                            />
+                          )}
                         </th>
                       ))}
                       {canShowActions && (
@@ -625,6 +738,7 @@ export const Listing = () => {
                       )}
                     </tr>
                   </thead>
+
                   <tbody className="divide-y divide-gray-200 relative">
                     {" "}
                     {loading ? (
@@ -652,7 +766,8 @@ export const Listing = () => {
                             {user.phone}
                           </td>
                           <td className="px-6 py-4 text-gray-500">
-                            {user.roles?.length > 0 ? (
+                            {Array.isArray(user.roles) &&
+                            user.roles.length > 0 ? (
                               user.roles.map((roleName, roleIndex) => (
                                 <span
                                   key={roleIndex}
@@ -776,20 +891,30 @@ export const Listing = () => {
                         <div>
                           <label className="text-gray-700">Role</label>
                           <Select
-                            options={roles.map((role) => ({
-                              value: role.role_Id,
-                              label: role.role_name,
-                            }))}
-                            value={roles
-                              .filter((role) =>
-                                Array.isArray(selectedUser.roles)
-                                  ? selectedUser.roles.includes(role.role_Id)
-                                  : selectedUser.roles === role.role_Id
-                              )
-                              .map((role) => ({
-                                value: role.role_Id,
-                                label: role.role_name,
-                              }))}
+                            options={
+                              Array.isArray(roles)
+                                ? roles.map((role) => ({
+                                    value: role.role_Id,
+                                    label: role.role_name,
+                                  }))
+                                : []
+                            }
+                            value={
+                              Array.isArray(roles)
+                                ? roles
+                                    .filter((role) =>
+                                      Array.isArray(selectedUser.roles)
+                                        ? selectedUser.roles.includes(
+                                            role.role_Id
+                                          )
+                                        : selectedUser.roles === role.role_Id
+                                    )
+                                    .map((role) => ({
+                                      value: role.role_Id,
+                                      label: role.role_name,
+                                    }))
+                                : []
+                            }
                             onChange={(selectedOptions) => {
                               setSelectedUser((prev) => ({
                                 ...prev,
@@ -933,10 +1058,14 @@ export const Listing = () => {
                   <div>
                     <label className="text-gray-700">Role</label>
                     <Select
-                      options={roles?.map((role) => ({
-                        value: role.role_Id,
-                        label: role.role_name,
-                      }))}
+                      options={
+                        Array.isArray(roles)
+                          ? roles.map((role) => ({
+                              value: role.role_Id,
+                              label: role.role_name,
+                            }))
+                          : []
+                      }
                       value={roles
                         .filter((role) => newUser.roles.includes(role.role_Id))
                         .map((role) => ({
