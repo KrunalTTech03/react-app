@@ -130,18 +130,24 @@ const AssignMenuPermission = ({ onClose, onPermissionsAssigned }) => {
         },
       });
 
-      if (response.data.success) {
-        const roles = response.data.data
-          .filter((role) => !role.isDeleted)
-          .map((role) => ({
-            value: role.role_Id,
-            label: role.role_name,
-          }));
+      console.log("Roles API Response:", response.data);
 
-        setRoleOptions(roles);
-      } else {
-        toast.error("Failed to fetch roles");
+      const data = response.data?.data?.roles;
+
+      if (!Array.isArray(data)) {
+        console.error("Expected array but got:", data);
+        toast.error("Unexpected roles format from server.");
+        return;
       }
+
+      const roles = data
+        .filter((role) => !role.isDeleted)
+        .map((role) => ({
+          value: role.role_Id,
+          label: role.role_name,
+        }));
+
+      setRoleOptions(roles);
     } catch (error) {
       toast.error("Error fetching roles");
       console.error("Error fetching roles:", error);

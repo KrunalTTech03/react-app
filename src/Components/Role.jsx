@@ -304,7 +304,7 @@ function Role() {
       return;
     }
 
-    setIsFilterApplied(true); // ✅ Filter is applied
+    setIsFilterApplied(true);
 
     const formattedRoles = filteredData.map((item) => ({
       role_Id: item.id,
