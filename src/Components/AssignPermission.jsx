@@ -25,10 +25,18 @@ function AssignPermission({ onClose }) {
     setLoading(true);
     try {
       const response = await axiosInstance.get("/Role/");
-      const roleOptions = response.data.data.map((role) => ({
+      console.log("Roles API Response:", response.data);
+      const data = response.data?.data?.roles;
+
+      if (!Array.isArray(data)) {
+        throw new Error("Roles data is not an array");
+      }
+
+      const roleOptions = data.map((role) => ({
         value: role.role_Id,
         label: role.role_name,
       }));
+
       setRoles(roleOptions);
     } catch (error) {
       console.error("Error fetching roles:", error);
@@ -39,63 +47,62 @@ function AssignPermission({ onClose }) {
   };
 
   const formatMenusForSelect = (menus, level = 0) => {
-  const indent = "  ".repeat(level); 
-  return menus.flatMap(menu => {
-    const formattedMenu = {
-      value: menu.id,
-      label: `${indent}${level > 0 ? "└─ " : ""}${menu.title}`,
-    };
+    const indent = "  ".repeat(level);
+    return menus.flatMap((menu) => {
+      const formattedMenu = {
+        value: menu.id,
+        label: `${indent}${level > 0 ? "└─ " : ""}${menu.title}`,
+      };
 
-    const subMenus = menu.subMenus?.length
-      ? formatMenusForSelect(menu.subMenus, level + 1)
-      : [];
+      const subMenus = menu.subMenus?.length
+        ? formatMenusForSelect(menu.subMenus, level + 1)
+        : [];
 
-    return [formattedMenu, ...subMenus];
-  });
-};
+      return [formattedMenu, ...subMenus];
+    });
+  };
 
+  const fetchMenus = async () => {
+    setLoading(true);
+    try {
+      const response = await axiosInstance.get("/Menu/all");
+      const menuData = response.data.data || [];
 
-const fetchMenus = async () => {
-  setLoading(true);
-  try {
-    const response = await axiosInstance.get("/Menu/all");
-    const menuData = response.data.data || [];
+      const menuOptions = formatMenusForSelect(menuData);
+      setMenus(menuOptions);
+    } catch (error) {
+      console.error("Error fetching menus:", error);
+      toast.error("Failed to load menus");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const menuOptions = formatMenusForSelect(menuData);
-    setMenus(menuOptions);
-  } catch (error) {
-    console.error("Error fetching menus:", error);
-    toast.error("Failed to load menus");
-  } finally {
-    setLoading(false);
-  }
-};
+  // const fetchMenus = async () => {
+  //     setLoading(true);
+  //     try {
+  //       const response = await axiosInstance.get("/Menu/all");
+  //       const menuData = response.data.data || [];
 
-// const fetchMenus = async () => {
-//     setLoading(true);
-//     try {
-//       const response = await axiosInstance.get("/Menu/all");
-//       const menuData = response.data.data || [];
+  //       const groupedMenuOptions = menuData.map((menu) => ({
+  //         label: menu.title,
+  //         options: [
+  //           { value: menu.id, label: menu.title },
+  //           ...(menu.subMenus || []).map((sub) => ({
+  //             value: sub.id,
+  //             label: sub.title,
+  //           })),
+  //         ],
+  //       }));
 
-//       const groupedMenuOptions = menuData.map((menu) => ({
-//         label: menu.title,
-//         options: [
-//           { value: menu.id, label: menu.title },
-//           ...(menu.subMenus || []).map((sub) => ({
-//             value: sub.id,
-//             label: sub.title,
-//           })),
-//         ],
-//       }));
-
-//       setMenus(groupedMenuOptions);
-//     } catch (error) {
-//       console.error("Error fetching menus:", error);
-//       toast.error("Failed to load menus");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+  //       setMenus(groupedMenuOptions);
+  //     } catch (error) {
+  //       console.error("Error fetching menus:", error);
+  //       toast.error("Failed to load menus");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
   const fetchPermissions = async () => {
     setLoading(true);
